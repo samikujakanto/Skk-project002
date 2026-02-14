@@ -3,409 +3,492 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Base Defense Tycoon</title>
+  <title>Tuomionpäivän bunkkeri</title>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background: #10131a;
-      color: #f3f5f8;
-    }
-    .wrap { display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; padding: 12px; }
-    .card { background:#181d28; border:1px solid #2a3243; border-radius:10px; padding:10px; }
-    h1,h2,h3 { margin:6px 0 8px; }
-    .stats { display:grid; grid-template-columns:repeat(4,minmax(110px,1fr)); gap:8px; }
-    .stat { background:#111621; border-radius:8px; padding:8px; border:1px solid #2e3748; }
-    .small { font-size:.86rem; opacity:.9; }
-    canvas { width:100%; height:300px; background:linear-gradient(180deg,#12203a,#1f2f3f); border-radius:10px; border:1px solid #2a3243; }
-    button,select {
-      background:#273448; color:#fff; border:1px solid #3e5474; border-radius:8px; padding:6px 10px; cursor:pointer;
-    }
-    button:hover { filter:brightness(1.1); }
-    .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
-    .brow { display:grid; grid-template-columns:1.2fr auto auto auto; gap:6px; align-items:center; margin:4px 0; font-size:.9rem; }
-    .warn { color:#ff7b7b; font-weight:700; }
-    .ok { color:#97f2a4; }
-    .event { min-height:52px; border-left:4px solid #67b0ff; padding:8px; background:#121b2d; border-radius:8px; }
-    .choices button { width:100%; margin-top:6px; }
-    .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-    .scroll { max-height:300px; overflow:auto; padding-right:4px; }
-    .muted { opacity:.75; }
-    @media (max-width: 960px) {
-      .wrap { grid-template-columns:1fr; }
-      canvas { height:260px; }
-      .stats { grid-template-columns:repeat(2,1fr); }
-      .brow { grid-template-columns:1fr auto; }
-      .brow button { grid-column:auto; }
-    }
+    body { margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,sans-serif; background:#0d1017; color:#ecf2ff; }
+    .app { display:grid; grid-template-columns: 1.35fr 1fr; gap:12px; padding:12px; }
+    .card { background:#161c2a; border:1px solid #2c3750; border-radius:12px; padding:10px; box-shadow:0 4px 20px rgba(0,0,0,.3); }
+    h1,h2,h3,h4 { margin:6px 0; }
+    .stats { display:grid; grid-template-columns: repeat(5,minmax(120px,1fr)); gap:8px; }
+    .stat { background:#101624; border:1px solid #2f3d5e; border-radius:8px; padding:8px; }
+    .small { font-size:.84rem; opacity:.88; }
+    .warn { color:#ff9a9a; font-weight:700; }
+    .ok { color:#88f0a1; }
+    .bar { height:10px; background:#232d45; border-radius:8px; overflow:hidden; border:1px solid #3c4c73; }
+    .bar > div { height:100%; }
+    .line { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .tabs button.active { background:#33507f; }
+    button,select,input { background:#25334d; border:1px solid #3e5277; color:white; border-radius:8px; padding:6px 9px; }
+    button:hover { filter:brightness(1.12); cursor:pointer; }
+    canvas { width:100%; height:370px; border-radius:10px; border:1px solid #31405e; background:#111; }
+    .hud { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:8px; }
+    .buildList { max-height:420px; overflow:auto; padding-right:4px; }
+    .brow { display:grid; grid-template-columns: 1.2fr auto auto auto auto; gap:6px; align-items:center; margin:4px 0; font-size:.86rem; background:#101624; border:1px solid #2a3650; border-radius:8px; padding:6px; }
+    .event { min-height:58px; border-left:4px solid #6bb6ff; border-radius:8px; background:#0f192b; padding:8px; }
+    .debug { display:none; gap:6px; flex-wrap:wrap; }
+    .pill { display:inline-block; border:1px solid #3e5277; border-radius:999px; padding:1px 7px; font-size:.75rem; margin-right:4px; }
+    @media(max-width:1100px){ .app{grid-template-columns:1fr;} .stats{grid-template-columns:repeat(2,1fr);} .hud{grid-template-columns:repeat(2,1fr);} .brow{grid-template-columns:1fr auto auto;} }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div>
-      <div class="card">
-        <h1>Base Defense Tycoon</h1>
-        <div class="stats" id="topStats"></div>
-        <div id="starveWarn" class="warn" style="display:none; margin-top:8px;">⚠ Starving: tuotanto ja puolustus -35%</div>
-      </div>
-      <div class="card">
-        <canvas id="battle" width="960" height="360"></canvas>
-        <div class="toolbar" style="margin-top:8px;">
-          <span id="battleState" class="small">Preparing...</span>
-          <span class="small">Difficulty:</span>
-          <select id="difficultySel"><option>Easy</option><option selected>Normal</option><option>Hard</option></select>
-          <button id="saveBtn">Save</button><button id="loadBtn">Load</button><button id="resetBtn">Reset</button>
-        </div>
-      </div>
-      <div class="card">
-        <h3>Pre-wave päätös (<span id="preTimer">-</span>)</h3>
-        <div class="choices grid3">
-          <button data-choice="fortify">Fortify (+20% defense)</button>
-          <button data-choice="plunder">Plunder (+30% reward, enemy HP +10%)</button>
-          <button data-choice="economy">Economic Focus (-15% upkeep, 60s)</button>
-        </div>
-      </div>
-      <div class="card">
-        <h3>Event</h3>
-        <div id="eventBox" class="event">Ei eventtiä vielä.</div>
+<div class="app">
+  <div>
+    <div class="card">
+      <h1>Tuomionpäivän bunkkeri</h1>
+      <div class="stats" id="stats"></div>
+      <div id="warnings" class="small" style="margin-top:6px"></div>
+    </div>
+    <div class="card">
+      <canvas id="battle" width="1100" height="410"></canvas>
+      <div class="hud" id="combatHud"></div>
+      <div class="line" style="margin-top:8px">
+        <span id="battleInfo" class="small"></span>
+        <button id="saveBtn">Save</button>
+        <button id="loadBtn">Load</button>
+        <button id="resetBtn">Reset</button>
       </div>
     </div>
-    <div>
-      <div class="card">
-        <h3>Rakennukset</h3>
-        <div class="small muted">Build / Upgrade / Repair (damage 0–3)</div>
-        <div id="buildings" class="scroll"></div>
+    <div class="card">
+      <h3>Pre-wave (<span id="preTimer">-</span>)</h3>
+      <div class="line">
+        <button data-choice="fortify">Linnoita (+20% defense)</button>
+        <button data-choice="plunder">Ryöstä (+30% reward, enemyHP +10%)</button>
+        <button data-choice="economy">Säästö (upkeep -15% 60s)</button>
       </div>
-      <div class="card">
-        <h3>Bonus Shop</h3>
-        <div id="shop"></div>
+    </div>
+    <div class="card">
+      <h3>Event</h3>
+      <div class="event" id="eventBox">Ei eventtejä vielä.</div>
+    </div>
+  </div>
+  <div>
+    <div class="card">
+      <h3>Rakennukset (120)</h3>
+      <div class="line tabs">
+        <button data-tab="economy" class="active">Economy</button>
+        <button data-tab="defense">Defense</button>
+        <button data-tab="other">Other</button>
+        <input id="search" placeholder="Hae nimellä" />
+        <select id="tierFilter"><option value="all">All tiers</option><option value="1">Tier1</option><option value="2">Tier2</option><option value="3">Tier3</option></select>
       </div>
-      <div class="card">
-        <h3>Debug</h3>
-        <div class="toolbar"><button id="debugToggle">Toggle</button></div>
-        <div id="debugPanel" style="display:none; margin-top:8px;" class="toolbar">
-          <button data-speed="1">x1</button><button data-speed="3">x3</button><button data-speed="5">x5</button>
-          <button id="spawnWave">Spawn Wave</button><button id="addMoney">+1000 money</button><button id="addFood">+500 food</button>
-        </div>
+      <div id="buildings" class="buildList"></div>
+    </div>
+    <div class="card">
+      <h3>Korjaukset & Bonus Shop</h3>
+      <div class="line">
+        <button id="repairOuter">Repair Outer</button>
+        <button id="repairInner">Repair Inner</button>
+        <button id="repairRandom">Repair Building</button>
+      </div>
+      <div id="shop"></div>
+    </div>
+    <div class="card">
+      <h3>Debug</h3>
+      <button id="dbgToggle">Toggle</button>
+      <div class="debug" id="debugPanel">
+        <button data-speed="1">x1</button><button data-speed="3">x3</button><button data-speed="5">x5</button>
+        <button id="dbgWave">Spawn wave</button><button id="dbgRes">+Res</button><button id="dbgHeal">Heal all</button>
       </div>
     </div>
   </div>
+</div>
 <script>
-const BALANCE = {
-  start: { money:1500, food:500, baseHP:150, wave:1, foodCap:600, baseDefense:2 },
-  base: { attackInterval:60, critChance:0.08, critMult:1.6, enemyTravel:12 },
-  difficulty: { Easy:{hp:1.09,power:1.08}, Normal:{hp:1.12,power:1.10}, Hard:{hp:1.14,power:1.12} },
-  buildings: {
-    market:{name:'Market',type:'money',baseCost:200,costGrowth:1.18,upkeep:0.5,baseUpgradeCost:180,moneyBase:5,moneyGrowth:1.25},
-    bank:{name:'Bank',type:'money',baseCost:350,costGrowth:1.18,upkeep:0.8,baseUpgradeCost:260,moneyBase:9,moneyGrowth:1.23},
-    tradePort:{name:'Trade Port',type:'money',baseCost:600,costGrowth:1.19,upkeep:1.2,baseUpgradeCost:450,moneyBase:15,moneyGrowth:1.22},
-    mint:{name:'Mint',type:'money',baseCost:900,costGrowth:1.2,upkeep:1.6,baseUpgradeCost:620,moneyBase:22,moneyGrowth:1.20},
-    investment:{name:'Investment Office',type:'money',baseCost:1300,costGrowth:1.21,upkeep:2.2,baseUpgradeCost:900,moneyBase:35,moneyGrowth:1.18},
-    cannon:{name:'Cannon Tower',type:'def',baseCost:250,costGrowth:1.17,upkeep:0.7,baseUpgradeCost:220,dpsBase:6,dpsGrowth:1.25},
-    ballista:{name:'Ballista',type:'def',baseCost:500,costGrowth:1.18,upkeep:1.1,baseUpgradeCost:400,dpsBase:12,dpsGrowth:1.22},
-    mortar:{name:'Mortar',type:'def',baseCost:800,costGrowth:1.19,upkeep:1.6,baseUpgradeCost:600,dpsBase:20,dpsGrowth:1.20},
-    wall:{name:'Wall',type:'def',baseCost:300,costGrowth:1.17,upkeep:0.6,baseUpgradeCost:240,reductionBase:0.04,reductionGrowth:1.05},
-    shield:{name:'Shield Generator',type:'def',baseCost:1200,costGrowth:1.2,upkeep:2.0,baseUpgradeCost:950,shieldBase:5,shieldGrowth:1.2},
-    farm:{name:'Farm',type:'other',baseCost:220,costGrowth:1.17,upkeep:0.2,baseUpgradeCost:180,foodBase:6,foodGrowth:1.25},
-    megaFarm:{name:'Mega Farm',type:'other',baseCost:540,costGrowth:1.18,upkeep:0.8,baseUpgradeCost:430,foodBase:14,foodGrowth:1.22},
-    warehouse:{name:'Warehouse',type:'other',baseCost:320,costGrowth:1.16,upkeep:0.4,baseUpgradeCost:280,foodCap:400},
-    lab:{name:'Research Lab',type:'other',baseCost:700,costGrowth:1.18,upkeep:0.6,baseUpgradeCost:520,prodBoost:0.04},
-    workshop:{name:'Workshop',type:'other',baseCost:650,costGrowth:1.18,upkeep:0.5,baseUpgradeCost:470,towerBoost:0.06},
-    barracks:{name:'Barracks',type:'other',baseCost:500,costGrowth:1.17,upkeep:0.7,baseUpgradeCost:390,barracksShield:4},
-    watchtower:{name:'Watchtower',type:'other',baseCost:450,costGrowth:1.17,upkeep:0.5,baseUpgradeCost:360,intervalAdd:3},
-    treasury:{name:'Treasury',type:'other',baseCost:520,costGrowth:1.17,upkeep:0.5,baseUpgradeCost:380,rewardBoost:0.06},
-    repairCenter:{name:'Repair Center',type:'other',baseCost:480,costGrowth:1.17,upkeep:0.4,baseUpgradeCost:350,repairReduction:0.15},
-    plant:{name:'Power Plant',type:'other',baseCost:980,costGrowth:1.2,upkeep:1.5,baseUpgradeCost:760,efficiencyBoost:0.05},
-  },
-  shop: {
-    money:{name:'Money Boost',gain:0.10,cap:1.0},
-    food:{name:'Food Boost',gain:0.10,cap:1.0},
-    defense:{name:'Defense Boost',gain:0.08,cap:1.0},
-    upkeep:{name:'Upkeep Reduction',gain:0.07,cap:0.5},
-    reward:{name:'Reward Boost',gain:0.08,cap:1.0},
-    basePrice:800
-  },
-  events:[
-    {name:'Good Harvest',apply:s=>s.food+=80,msg:'+80 food'},
-    {name:'Market Boom',apply:s=>s.money+=120,msg:'+120 money'},
-    {name:'Storm',apply:s=>s.timers.storm=60,msg:'Defense -15% (60s)'},
-    {name:'Volunteers',apply:s=>s.timers.volunteers=60,msg:'Defense +15% (60s)'},
-    {name:'Thieves',apply:s=>s.money=Math.max(0,s.money-100),msg:'-100 money'},
-    {name:'Innovation',apply:s=>s.timers.innovation=60,msg:'Production +10% (60s)'},
-    {name:'Drought',apply:s=>s.timers.drought=60,msg:'Food production -15% (60s)'},
-    {name:'Trade Caravan',apply:s=>s.nextWaveRewardBonus+=0.15,msg:'Next wave reward +15%'}
-  ]
+const START = { money:5000, food:1500, materials:800, energy:200, ammo:300, baseHP:220, wave:1, foodCap:1200, materialsCap:1200, ammoCap:800, energyCap:600, attackInterval:60, attackDuration:12 };
+const tierMult = {1:1,2:1.15,3:1.35};
+const BONUS_SHOP = {
+  money:{name:'Money income +10%',gain:0.10,cap:2.5}, food:{name:'Food income +10%',gain:0.10,cap:2.5}, defense:{name:'Defense +8%',gain:0.08,cap:1.8}, upkeep:{name:'Upkeep -7%',gain:0.07,cap:0.6}, rewards:{name:'Rewards +8%',gain:0.08,cap:1.6}
 };
+const EVENTS = [
+  {n:'Hylätty varasto',instant:s=>s.materials=Math.min(s.materialsCap,s.materials+320),msg:'+320 materials'},
+  {n:'Vanha kassakaappi',instant:s=>s.money+=360,msg:'+360 money'},
+  {n:'Aurinkopiikki',buff:{key:'energyOut',mul:1.16,t:60},msg:'Energy output +16% (60s)'},
+  {n:'Ruokamyrsky',buff:{key:'foodOut',mul:1.18,t:60},msg:'Food output +18% (60s)'},
+  {n:'Ammusjuna',instant:s=>s.ammo=Math.min(s.ammoCap,s.ammo+240),msg:'+240 ammo'},
+  {n:'Sabotaasi',buff:{key:'globalEff',mul:0.85,t:60},msg:'Global efficiency -15% (60s)'},
+  {n:'Korjauspartio',buff:{key:'defense',mul:1.14,t:60},msg:'Defense +14% (60s)'},
+  {n:'Polttoainekriisi',buff:{key:'upkeep',mul:1.15,t:60},msg:'Upkeep +15% (60s)'},
+  {n:'Raiderit ryöstivät',instant:s=>s.money=Math.max(0,s.money-260),msg:'-260 money'},
+  {n:'Kylmä aalto',buff:{key:'globalEff',mul:0.9,t:60},msg:'Efficiency -10% (60s)'},
+  {n:'Kenttälaboratorio',buff:{key:'tower',mul:1.2,t:60},msg:'Tower DPS +20% (60s)'},
+  {n:'Pelastussaattue',instant:s=>{s.food=Math.min(s.foodCap,s.food+260);s.energy=Math.min(s.energyCap,s.energy+160)},msg:'+Food + Energy'}
+];
+const enemyStyles = { runner:'#77d4ff', brute:'#ff9f6f', tank:'#b2b2b2', swarm:'#d8ff7c', sniper:'#c392ff', boss:'#ff4b5f' };
+const WPN = ['bullet','bolt','rocket','laser','flame','emp'];
+
+function createBuildings(){
+  const econBases = [
+    ['Scrip Printer','moneyPer'],['Hydro Farm','foodPer'],['Scrap Press','materialsPer'],['Solar Rig','energyPer'],['Ammo Bench','ammoPer'],['Trade Vault','moneyPer'],['Mushroom Dome','foodPer'],['Recycler Forge','materialsPer']
+  ];
+  const defBases = [
+    ['Perimeter MG','towerDps'],['Bolt Turret','towerDps'],['Rocket Nest','towerDps'],['Laser Array','towerDps'],['Flame Ditch','burnChance'],['EMP Coil','slowChance'],['Wall Plate','mitigation'],['Shield Post','shieldFlat']
+  ];
+  const otherBases = [
+    ['Command Bunker','globalEff'],['Repair Bay','repairPower'],['Logistics Hub','upkeepMod'],['Med Ward','defenseMod'],['Radar Mast','critChance'],['Drill School','towerDps'],['Perimeter Works','outerIntegrity'],['Gate Works','innerIntegrity']
+  ];
+  const mkMods=[1,1.28,1.58,1.93,2.35];
+  const list=[];
+  let id=0;
+  for (const [cat,bases] of [['economy',econBases],['defense',defBases],['other',otherBases]]){
+    bases.forEach((base,bi)=>{
+      for(let mk=1;mk<=5;mk++){
+        const tier = mk<=2?1:mk===3?2:3;
+        const b={id:`b${id++}`,name:`${base[0]} MK-${mk}`,category:cat,tier,count:0,level:1,ascendRank:0,damageLevel:0,costGrowth:1.13+bi*0.004+mk*0.004,baseCostMoney:120+bi*95+mk*70,baseCostMaterials:tier>1?70+bi*28+mk*22:0,baseUpgradeCost:180+bi*85+mk*80,baseUpgradeMaterials:tier>1?85+bi*24+mk*30:0,baseUpkeepFood:0.08*(1+bi*0.13),baseUpkeepEnergy:0.12*(1+bi*0.1),baseAmmoUse:cat==='defense'&&bi<6?0.07*mk:0,output:{}};
+        const val = 2.8*mkMods[mk-1]*(1+bi*0.09);
+        b.output[base[1]] = val;
+        if(cat==='defense'){
+          b.weapon = WPN[bi%WPN.length];
+          if(base[1]==='towerDps') b.output.towerDps = 5.5*mkMods[mk-1]*(1+bi*0.16);
+          if(base[1]==='burnChance') b.output.burnChance = Math.min(.52,0.08*mk+bi*0.01);
+          if(base[1]==='slowChance') b.output.slowChance = Math.min(.6,0.1*mk+bi*0.01);
+          if(base[1]==='mitigation') b.output.mitigation = 0.013*mk*(1+bi*0.02);
+          if(base[1]==='shieldFlat') b.output.shieldFlat = 1.7*mk*(1+bi*0.05);
+        }
+        if(cat==='other'){
+          b.output.globalEff = base[1]==='globalEff'?0.014*mk:0;
+          b.output.repairPower = base[1]==='repairPower'?0.7*mk:0;
+          b.output.upkeepMod = base[1]==='upkeepMod'?0.012*mk:0;
+          b.output.defenseMod = base[1]==='defenseMod'?0.012*mk:0;
+          b.output.critChance = base[1]==='critChance'?0.006*mk:0;
+          b.output.outerIntegrity = base[1]==='outerIntegrity'?1.5*mk:0;
+          b.output.innerIntegrity = base[1]==='innerIntegrity'?1.5*mk:0;
+          b.output.towerDps = base[1]==='towerDps'?2.2*mk:0;
+        }
+        list.push(b);
+      }
+    });
+  }
+  return list;
+}
 
 const state = {
-  money:0, food:0, baseHP:0, wave:1, foodCap:0, baseDefense:0,
-  buildings:{}, shopPurchases:{money:0,food:0,defense:0,upkeep:0,reward:0},
-  rates:{money:0,food:0,upkeep:0,dps:0,wallReduction:0,shield:0,barracksShield:0,rewardMult:1,prodMult:1},
-  battle:{active:false,enemies:[],fireTimer:0,text:'',choice:'fortify',plunder:false},
-  timers:{nextAttack:60,preWave:0,starveRecovery:0,econFocus:0,storm:0,volunteers:0,innovation:0,drought:0},
-  starving:false,eventText:'',nextWaveRewardBonus:0,timeScale:1,difficulty:'Normal',gameOver:false
+  ...structuredClone(START),
+  outer:100, inner:100, tab:'economy', search:'', tierFilter:'all', choice:'fortify', prewave:0,
+  buildings:createBuildings(), buffs:[], eventMsg:'', timeScale:1, gameOver:false,
+  shop:{money:0,food:0,defense:0,upkeep:0,rewards:0},
+  battle:{active:false,timer:0,enemies:[],projectiles:[],particles:[],numbers:[],shake:0,waveCfg:null,rewardMul:1},
+  attackCooldown:START.attackInterval
 };
+const canvas = document.getElementById('battle'), ctx = canvas.getContext('2d');
 
-const canvas = document.getElementById('battle'); const ctx = canvas.getContext('2d');
+const $=s=>document.querySelector(s); const $$=s=>document.querySelectorAll(s);
+function fmt(n){ return n>=1e6?`${(n/1e6).toFixed(2)}M`:n.toFixed(1); }
+function cap(v,m){ return Math.max(-99999,Math.min(m,v)); }
+function levelMult(l){ return (1 + 0.22*(l-1)) * (1 + 0.9*Math.log10(1+l)); }
+function ascendBonus(r){ return 1 + 0.08*r; }
+function bEff(b){ return (1-0.1*b.damageLevel)*levelMult(b.level)*ascendBonus(b.ascendRank); }
+function mulShop(k){ const c=state.shop[k], g=BONUS_SHOP[k].gain; return k==='upkeep'?Math.max(0.4,1-c*g):1+c*g; }
 
-function init() {
-  Object.assign(state, structuredClone(BALANCE.start));
-  for (const k of Object.keys(BALANCE.buildings)) state.buildings[k] = {count:0,level:1,damageLevel:0};
-  updateBuildingUI(); updateShopUI(); bindUI(); loadGame(true); computeRates();
-  requestAnimationFrame(loop);
-  setInterval(saveGame,5000);
+function calc(){
+  const out={money:0,food:0,materials:0,energy:0,ammo:0,upkeepFood:0,upkeepEnergy:0,ammoUse:0,towerDps:0,mitigation:0,shield:0,slow:0,burn:0,globalEff:1,defenseMult:1,repair:1,outerBoost:0,innerBoost:0,crit:0.06};
+  for(const b of state.buildings){
+    if(!b.count) continue;
+    const m=bEff(b), c=b.count;
+    out.upkeepFood += b.baseUpkeepFood*c*mulShop('upkeep');
+    out.upkeepEnergy += b.baseUpkeepEnergy*c*mulShop('upkeep');
+    out.ammoUse += b.baseAmmoUse*c;
+    for(const [k,v] of Object.entries(b.output||{})){
+      const add=v*c*m;
+      if(k==='moneyPer') out.money += add;
+      if(k==='foodPer') out.food += add;
+      if(k==='materialsPer') out.materials += add;
+      if(k==='energyPer') out.energy += add;
+      if(k==='ammoPer') out.ammo += add;
+      if(k==='towerDps') out.towerDps += add;
+      if(k==='mitigation') out.mitigation += add;
+      if(k==='shieldFlat') out.shield += add;
+      if(k==='slowChance') out.slow += add;
+      if(k==='burnChance') out.burn += add;
+      if(k==='globalEff') out.globalEff += add;
+      if(k==='defenseMod') out.defenseMult += add;
+      if(k==='repairPower') out.repair += add;
+      if(k==='outerIntegrity') out.outerBoost += add;
+      if(k==='innerIntegrity') out.innerBoost += add;
+      if(k==='critChance') out.crit += add;
+      if(k==='upkeepMod') out.upkeepFood *= Math.max(0.4,1-add*0.01);
+    }
+  }
+  out.money*=mulShop('money'); out.food*=mulShop('food'); out.defenseMult*=1+state.shop.defense*0.08;
+  out.rewardMul = (1+state.shop.rewards*0.08)*state.battle.rewardMul;
+
+  let ge = out.globalEff;
+  if(state.food<0){ ge*=0.65; out.defenseMult*=0.65; }
+  if(state.energy<0){ ge*=0.85; }
+  if(state.ammo<=0) out.towerDps*=0.75;
+  for(const bf of state.buffs) {
+    if(bf.key==='globalEff') ge*=bf.mul;
+    if(bf.key==='foodOut') out.food*=bf.mul;
+    if(bf.key==='energyOut') out.energy*=bf.mul;
+    if(bf.key==='tower') out.towerDps*=bf.mul;
+    if(bf.key==='defense') out.defenseMult*=bf.mul;
+    if(bf.key==='upkeep') { out.upkeepFood*=bf.mul; out.upkeepEnergy*=bf.mul; }
+  }
+  if(state.choice==='fortify' && state.battle.active) out.defenseMult*=1.2;
+  out.ge = ge;
+  out.mitigation=Math.min(0.75,out.mitigation*0.01*out.defenseMult*(state.inner<=0?0.5:1));
+  return out;
 }
 
-function bindUI(){
-  document.querySelectorAll('[data-choice]').forEach(b=>b.onclick=()=>state.battle.choice=b.dataset.choice);
-  document.getElementById('difficultySel').onchange=e=>state.difficulty=e.target.value;
-  document.getElementById('saveBtn').onclick=saveGame;
-  document.getElementById('loadBtn').onclick=()=>loadGame(false);
-  document.getElementById('resetBtn').onclick=()=>{localStorage.removeItem('bd_save_v1'); location.reload();};
-  document.getElementById('debugToggle').onclick=()=>{
-    const p=document.getElementById('debugPanel'); p.style.display=p.style.display==='none'?'flex':'none';
-  };
-  document.querySelectorAll('#debugPanel [data-speed]').forEach(b=>b.onclick=()=>state.timeScale=+b.dataset.speed);
-  document.getElementById('spawnWave').onclick=()=>{ if(!state.battle.active) startWave(); };
-  document.getElementById('addMoney').onclick=()=>state.money+=1000;
-  document.getElementById('addFood').onclick=()=>state.food+=500;
+function buildCost(b){
+  const money = b.baseCostMoney * Math.pow(b.costGrowth,b.count) * (1+0.06*(b.level-1)) * tierMult[b.tier];
+  const materials = b.tier>1 ? b.baseCostMaterials*Math.pow(1.12,b.count) : 0;
+  return {money,materials};
 }
-
-let last=performance.now();
-function loop(now){
-  const dt=Math.min(0.1,(now-last)/1000)*state.timeScale; last=now;
-  tick(dt); draw(); requestAnimationFrame(loop);
+function upgCost(b){
+  const money = b.baseUpgradeCost*Math.pow(1.85,b.level-1)*Math.pow(1.12,b.count)*tierMult[b.tier];
+  const materials = b.tier>1 ? b.baseUpgradeMaterials*Math.pow(1.55,b.level-1) : 0;
+  return {money,materials};
 }
+function ascCost(b){ return {money:25000*Math.pow(1.35,b.ascendRank), materials:4000*Math.pow(1.45,b.ascendRank)}; }
 
-function tick(dt){
-  if(state.gameOver) return updateUI();
-  for (const t in state.timers) if (state.timers[t]>0) state.timers[t]=Math.max(0,state.timers[t]-dt);
+function buy(b){ const c=buildCost(b); if(state.money>=c.money&&state.materials>=c.materials){ state.money-=c.money; state.materials-=c.materials; b.count++; }}
+function upg(b){ const c=upgCost(b); if(state.money>=c.money&&state.materials>=c.materials){ state.money-=c.money; state.materials-=c.materials; b.level++; }}
+function ascend(b){ if(b.level<25||b.ascendRank>=20) return; const c=ascCost(b); if(state.money>=c.money&&state.materials>=c.materials){ state.money-=c.money; state.materials-=c.materials; b.level=1; b.ascendRank++; }}
 
-  if(state.food<0){ state.starving=true; state.timers.starveRecovery=0; }
-  if(state.starving && state.food>0){ state.timers.starveRecovery+=dt; if(state.timers.starveRecovery>=5) state.starving=false; }
+function update(dt){
+  if(state.gameOver) return;
+  const rate=calc();
+  state.money += rate.money*rate.ge*dt;
+  state.food = cap(state.food + (rate.food*rate.ge-rate.upkeepFood)*dt,state.foodCap);
+  state.materials = cap(state.materials + rate.materials*rate.ge*dt,state.materialsCap);
+  state.energy = cap(state.energy + (rate.energy*rate.ge-rate.upkeepEnergy)*dt,state.energyCap);
+  state.ammo = cap(state.ammo + (rate.ammo*rate.ge-rate.ammoUse)*dt,state.ammoCap);
 
-  computeRates();
-  state.money += state.rates.money*dt;
-  state.food = Math.min(state.foodCap, state.food + (state.rates.food-state.rates.upkeep)*dt);
+  state.buffs = state.buffs.filter(b=> (b.t-=dt)>0);
 
   if(!state.battle.active){
-    state.timers.nextAttack -= dt;
-    if(state.timers.nextAttack<=10 && state.timers.preWave<=0) startPreWave();
-    if(state.timers.nextAttack<=0) startWave();
-  } else {
-    updateBattle(dt);
-  }
-  updateUI();
+    state.attackCooldown -= dt;
+    if(state.attackCooldown<=10 && state.prewave<=0) state.prewave=10;
+    if(state.prewave>0) state.prewave=Math.max(0,state.prewave-dt);
+    if(state.attackCooldown<=0) startWave();
+  } else battleTick(dt,rate);
+
+  if(Math.random()<dt/16) triggerEvent();
 }
 
-function computeRates(){
-  const b=state.buildings; let money=0, food=0, upkeep=0, dps=0, wall=0, shield=0;
-  let prodMult=1, rewardMult=1, towerBoost=1, defenseMult=1, effBoost=1;
-  const dmgMult = key => 1 - 0.1 * b[key].damageLevel;
-  const levelPow = (base,growth,lv)=>base*Math.pow(growth,lv-1);
-
-  for(const [k,v] of Object.entries(BALANCE.buildings)){
-    const st=b[k], eff=dmgMult(k), cnt=st.count, lv=st.level;
-    upkeep += v.upkeep*cnt;
-    if(v.moneyBase) money += cnt * levelPow(v.moneyBase,v.moneyGrowth,lv) * eff;
-    if(v.foodBase) food += cnt * levelPow(v.foodBase,v.foodGrowth,lv) * eff;
-    if(v.dpsBase) dps += cnt * levelPow(v.dpsBase,v.dpsGrowth,lv) * eff;
-    if(v.reductionBase) wall += cnt * levelPow(v.reductionBase,v.reductionGrowth,lv) * eff;
-    if(v.shieldBase) shield += cnt * levelPow(v.shieldBase,v.shieldGrowth,lv) * eff;
-    if(v.foodCap) state.foodCap = BALANCE.start.foodCap + cnt*v.foodCap;
-    if(v.prodBoost) prodMult += cnt*v.prodBoost*eff;
-    if(v.towerBoost) towerBoost += cnt*v.towerBoost*eff;
-    if(v.rewardBoost) rewardMult += cnt*v.rewardBoost*eff;
-    if(v.efficiencyBoost) effBoost += cnt*v.efficiencyBoost*eff;
-  }
-  const barracksShield = b.barracks.count*BALANCE.buildings.barracks.barracksShield*dmgMult('barracks');
-  const intervalBonus=Math.min(20,b.watchtower.count*BALANCE.buildings.watchtower.intervalAdd*dmgMult('watchtower'));
-  state.currentAttackInterval = BALANCE.base.attackInterval + intervalBonus;
-
-  const shopMult=(key,gain)=>1 + Math.min(BALANCE.shop[key].cap,state.shopPurchases[key]*gain);
-  money *= shopMult('money',0.1); food*=shopMult('food',0.1);
-  rewardMult *= shopMult('reward',0.08);
-  defenseMult *= shopMult('defense',0.08);
-  upkeep *= (1-Math.min(0.5,state.shopPurchases.upkeep*0.07));
-
-  if(state.timers.econFocus>0) upkeep*=0.85;
-  if(state.timers.innovation>0) prodMult*=1.1;
-  if(state.timers.drought>0) food*=0.85;
-
-  if(state.starving){ money*=0.65; food*=0.65; dps*=0.65; defenseMult*=0.65; }
-  if(state.timers.storm>0) defenseMult*=0.85;
-  if(state.timers.volunteers>0) defenseMult*=1.15;
-  if(state.battle.choice==='fortify' && state.timers.preWave<=0 && !state.battle.active) defenseMult*=1.2;
-
-  dps*=towerBoost*effBoost; money*=prodMult*effBoost; food*=prodMult*effBoost;
-  wall=Math.min(0.7,wall);
-  state.rates={money,food,upkeep,dps,wallReduction:wall,shield,barracksShield,rewardMult,rewardMultBase:rewardMult,prodMult,defenseMult};
+function enemyStat(w){
+  const baseHP = 180*Math.pow(1.12,w-1)+7*w;
+  const basePow=22*Math.pow(1.10,w-1)+1.6*w;
+  return {hp:baseHP,pow:basePow};
 }
-
-function startPreWave(){ state.timers.preWave=10; }
-
-function buildEnemy(){
-  const d=BALANCE.difficulty[state.difficulty];
-  let hp = 80*Math.pow(d.hp,state.wave-1)+5*state.wave;
-  const power = 12*Math.pow(d.power,state.wave-1)+state.wave;
-  if(state.battle.choice==='plunder') hp*=1.1;
-  return {x:canvas.width-20,y:80+Math.random()*200,hp,maxHp:hp,power,t:0,alive:true,reached:false};
+function spawnEnemy(type,w){
+  const s=enemyStat(w); const map={runner:[0.55,1.85],brute:[1,1],tank:[2.2,0.62],swarm:[0.38,1.4],sniper:[0.7,1.15],boss:[3.2,0.8]};
+  const [hm,sm]=map[type];
+  const hp=s.hp*hm*(state.choice==='plunder'?1.1:1);
+  return {type,x:1020+Math.random()*60,y:200+Math.random()*120-60,hp,maxHp:hp,shield:type==='boss'?hp*0.2:hp*0.06,pow:s.pow*(type==='boss'?1.6:type==='sniper'?1.25:1),speed:(40+state.wave*1.5)*sm,slow:0,burn:0,stun:0};
 }
-
 function startWave(){
-  if(state.gameOver) return;
-  state.timers.preWave=0;
-  applyEvent();
-  state.battle.active=true; state.battle.fireTimer=0; state.battle.text=''; state.battle.plunder=state.battle.choice==='plunder';
-  const n = state.wave<=10?1:(state.wave<=25?2:3);
-  state.battle.enemies=Array.from({length:n},buildEnemy);
+  state.battle.active=true; state.battle.timer=START.attackDuration; state.battle.rewardMul=state.choice==='plunder'?1.3:1;
+  const arr=[]; const isBoss=state.wave%10===0;
+  const count = 8 + Math.floor(state.wave*1.25);
+  const types=['runner','brute','tank','swarm','sniper'];
+  for(let i=0;i<count;i++){ let t=types[(i+Math.floor(Math.random()*types.length))%types.length]; if(Math.random()<0.22) t='swarm'; arr.push(spawnEnemy(t,state.wave)); if(t==='swarm' && Math.random()<0.6) arr.push(spawnEnemy('swarm',state.wave)); }
+  if(isBoss) arr.push(spawnEnemy('boss',state.wave));
+  state.battle.enemies=arr; state.prewave=0;
 }
-
-function updateBattle(dt){
-  const spd=(canvas.width-160)/BALANCE.base.enemyTravel;
-  for(const e of state.battle.enemies){
-    if(!e.alive || e.reached) continue;
-    e.x -= spd*dt; e.t+=dt;
-    if(e.x<=120){ e.reached=true; e.alive=false; onEnemyHitBase(e); }
+function endWave(win){
+  if(win){
+    const w=state.wave;
+    const mul=state.battle.rewardMul;
+    let m=(260*Math.pow(1.07,w-1)+1.4*w)*mul;
+    let f=(70*Math.pow(1.06,w-1)+0.7*w)*mul;
+    let mat=(35*Math.pow(1.06,w-1))*mul;
+    let am=(18*Math.pow(1.05,w-1))*mul;
+    if(w%10===0){m*=2.2;f*=2.2;mat*=2.2;am*=2.2;}
+    const rw=calc().rewardMul;
+    state.money += m*rw; state.food=cap(state.food+f*rw,state.foodCap); state.materials=cap(state.materials+mat*rw,state.materialsCap); state.ammo=cap(state.ammo+am*rw,state.ammoCap);
+    state.wave++;
   }
-  state.battle.fireTimer += dt;
-  while(state.battle.fireTimer>=0.5){ state.battle.fireTimer-=0.5; resolveAttack(); }
-  const alive=state.battle.enemies.filter(e=>e.alive).length;
-  if(alive===0){
-    state.battle.active=false;
-    const won = state.baseHP>0;
-    state.battle.text= won ? 'Victory' : 'Defeat';
-    if(won){
-      let rewardMoney=120*Math.pow(1.07,state.wave-1), rewardFood=30*Math.pow(1.06,state.wave-1);
-      let rm=state.rates.rewardMult*(1+state.nextWaveRewardBonus)*(state.battle.plunder?1.3:1);
-      state.money += rewardMoney*rm; state.food = Math.min(state.foodCap,state.food+rewardFood*rm);
-      state.nextWaveRewardBonus=0;
-      state.wave++;
-      state.timers.nextAttack = state.currentAttackInterval;
-      state.battle.choice='fortify';
-    } else state.gameOver=true;
+  state.battle.active=false; state.attackCooldown=START.attackInterval;
+}
+
+function battleTick(dt,rate){
+  state.battle.timer-=dt;
+  const e=state.battle.enemies;
+  const dps=rate.towerDps*rate.ge;
+  if(e.length){
+    const shots=Math.max(1,Math.floor(dps/26));
+    for(let i=0;i<shots;i++){
+      const t=e[Math.floor(Math.random()*e.length)]; if(!t) continue;
+      const dmg=(dps/shots)*(0.4+Math.random()*0.9)*dt;
+      const crit=Math.random()<Math.min(0.45,rate.crit);
+      hitEnemy(t,dmg*(crit?1.8:1),crit,rate);
+      state.battle.projectiles.push({x:130,y:210,vx:(t.x-130)/9,vy:(t.y-210)/9,t:0.3,type:WPN[i%WPN.length]});
+    }
   }
-}
 
-function resolveAttack(){
-  let dmg = state.rates.dps*0.5;
-  if(Math.random()<BALANCE.base.critChance) dmg*=BALANCE.base.critMult;
-  const target=state.battle.enemies.find(e=>e.alive);
-  if(target){ target.hp-=dmg; if(target.hp<=0){ target.alive=false; target.hp=0; } }
-}
+  for(const en of e){
+    if(en.slow>0) en.slow-=dt;
+    if(en.burn>0){ en.burn-=dt; hitEnemy(en,10*dt,false,rate,true); }
+    if(en.stun>0){ en.stun-=dt; continue; }
+    let sp=en.speed*(en.slow>0?0.5:1);
+    if(state.outer<=0) sp*=1.25;
+    en.x-=sp*dt;
 
-function onEnemyHitBase(e){
-  const incoming = Math.max(1,e.power - state.rates.shield - state.rates.barracksShield - state.baseDefense);
-  const reduced = incoming * (1-state.rates.wallReduction) / Math.max(0.1,state.rates.defenseMult);
-  state.baseHP -= Math.max(1,reduced);
-  if(state.baseHP<=0){ state.baseHP=0; state.gameOver=true; }
-  const keys=Object.keys(state.buildings); const k=keys[Math.floor(Math.random()*keys.length)];
-  state.buildings[k].damageLevel=Math.min(3,state.buildings[k].damageLevel+1);
-}
+    if(en.x<650 && state.outer>0){
+      const trap=45*(1+rate.burn)*(state.outer/100)*dt;
+      hitEnemy(en,trap,false,rate,false,true);
+      if(Math.random()<Math.min(.7,rate.slow*0.012)) en.slow=2.2;
+    }
 
-function applyEvent(){
-  const ev=BALANCE.events[Math.floor(Math.random()*BALANCE.events.length)];
-  ev.apply(state); state.eventText=`${ev.name}: ${ev.msg}`;
-}
-
-function bCosts(key){
-  const cfg=BALANCE.buildings[key], st=state.buildings[key];
-  const nextCost = cfg.baseCost * Math.pow(cfg.costGrowth,st.count) * (1+0.1*(st.level-1));
-  const upgradeCost = cfg.baseUpgradeCost * Math.pow(1.6,st.level-1) * Math.pow(1.1,st.count);
-  let repairCost = 50 * Math.pow(1.3,st.count);
-  repairCost *= Math.max(0.2,1 - state.buildings.repairCenter.count*BALANCE.buildings.repairCenter.repairReduction);
-  return {nextCost,upgradeCost,repairCost};
-}
-
-function updateBuildingUI(){
-  const el=document.getElementById('buildings'); el.innerHTML='';
-  for(const [k,cfg] of Object.entries(BALANCE.buildings)){
-    const row=document.createElement('div'); row.className='brow'; row.id='b_'+k;
-    row.innerHTML=`<div><b>${cfg.name}</b> <span class="small" id="i_${k}"></span></div>
-      <button onclick="actBuild('${k}')">Build</button>
-      <button onclick="actUpgrade('${k}')">Upgrade</button>
-      <button onclick="actRepair('${k}')">Repair</button>`;
-    el.appendChild(row);
+    if(en.x<110){
+      let dmg=en.pow*(1-rate.mitigation)-rate.shield;
+      dmg=Math.max(1,dmg);
+      applyBaseHit(dmg,en); en.hp=0;
+    }
   }
+  state.battle.enemies = e.filter(x=>x.hp>0);
+  state.battle.projectiles = state.battle.projectiles.filter(p=>(p.t-=dt)>0);
+  state.battle.particles = state.battle.particles.filter(p=>(p.t-=dt)>0);
+  state.battle.numbers = state.battle.numbers.filter(n=>(n.t-=dt)>0);
+
+  if(state.battle.enemies.length===0 || state.battle.timer<=0) endWave(true);
+}
+function hitEnemy(en,dmg,crit,rate,dot=false,trap=false){
+  if(en.shield>0){ const s=Math.min(en.shield,dmg*0.65); en.shield-=s; dmg-=s; }
+  en.hp-=dmg;
+  state.battle.numbers.push({x:en.x,y:en.y-25,t:0.8,text:`${crit?'CRIT ':''}${dmg.toFixed(0)}`,c:crit?'#ffd86b':dot?'#ff8f66':trap?'#8df0ff':'#fff'});
+  if(Math.random()<Math.min(0.65,rate.burn*0.01)) en.burn=3;
+  if(Math.random()<Math.min(0.55,rate.slow*0.01)) en.slow=2.2;
+  if(Math.random()<0.04+rate.mitigation*0.08) en.stun=0.7;
+  if(en.hp<=0) for(let i=0;i<8;i++) state.battle.particles.push({x:en.x,y:en.y,vx:(Math.random()-0.5)*90,vy:(Math.random()-0.5)*90,t:0.55,c:enemyStyles[en.type]});
+}
+function applyBaseHit(dmg,en){
+  if(state.outer>0){ state.outer=Math.max(0,state.outer-dmg*0.22); state.battle.shake=6; }
+  else if(state.inner>0){ state.inner=Math.max(0,state.inner-dmg*0.2); state.battle.shake=7; }
+  else { state.baseHP-=dmg; state.battle.shake=en.type==='boss'?14:9; if(state.baseHP<=0) state.gameOver=true; }
+  const pool=state.buildings.filter(b=>b.count>0&&b.damageLevel<3);
+  if(pool.length && Math.random()<0.42) pool[(Math.random()*pool.length)|0].damageLevel++;
 }
 
-function updateShopUI(){
-  const el=document.getElementById('shop'); el.innerHTML='';
-  for(const [k,v] of Object.entries(BALANCE.shop)) if(k!=='basePrice'){
-    const d=document.createElement('div'); d.className='brow';
-    d.innerHTML=`<div><b>${v.name}</b> <span id="s_${k}" class="small"></span></div><button onclick="buyShop('${k}')">Buy</button>`;
-    el.appendChild(d);
-  }
-}
-
-function actBuild(k){ const c=bCosts(k).nextCost; if(state.money>=c){ state.money-=c; state.buildings[k].count++; } }
-function actUpgrade(k){ const st=state.buildings[k]; const c=bCosts(k).upgradeCost; if(st.level<5 && state.money>=c){ state.money-=c; st.level++; } }
-function actRepair(k){ const st=state.buildings[k]; const c=bCosts(k).repairCost; if(st.damageLevel>0 && state.money>=c){ state.money-=c; st.damageLevel--; } }
-function buyShop(k){ const n=state.shopPurchases[k]; const price=BALANCE.shop.basePrice*Math.pow(1.6,n); if(state.money>=price && n*BALANCE.shop[k].gain < BALANCE.shop[k].cap){ state.money-=price; state.shopPurchases[k]++; } }
-window.actBuild=actBuild; window.actUpgrade=actUpgrade; window.actRepair=actRepair; window.buyShop=buyShop;
-
-function updateUI(){
-  document.getElementById('topStats').innerHTML = [
-    `Money: ${state.money.toFixed(0)}`,
-    `Food: ${state.food.toFixed(0)} / ${state.foodCap.toFixed(0)}`,
-    `Base HP: ${state.baseHP.toFixed(1)}`,
-    `Wave: ${state.wave}`,
-    `Money/s: ${state.rates.money.toFixed(1)}`,
-    `Food/s net: ${(state.rates.food-state.rates.upkeep).toFixed(1)}`,
-    `DPS: ${state.rates.dps.toFixed(1)}`,
-    `Next attack: ${Math.max(0,state.timers.nextAttack).toFixed(1)}s`
-  ].map(t=>`<div class="stat">${t}</div>`).join('');
-  document.getElementById('battleState').textContent = state.gameOver ? 'GAME OVER' : (state.battle.active?'Battle!':'Build phase');
-  document.getElementById('preTimer').textContent = state.timers.preWave>0 ? `${state.timers.preWave.toFixed(1)}s` : 'inactive';
-  document.getElementById('eventBox').textContent = state.eventText || 'Ei eventtiä vielä.';
-  document.getElementById('starveWarn').style.display = state.starving ? 'block':'none';
-
-  for(const k of Object.keys(BALANCE.buildings)){
-    const st=state.buildings[k], c=bCosts(k);
-    document.getElementById('i_'+k).textContent = `x${st.count} L${st.level} dmg:${st.damageLevel} | B:${c.nextCost.toFixed(0)} U:${c.upgradeCost.toFixed(0)} R:${c.repairCost.toFixed(0)}`;
-  }
-  for(const [k,v] of Object.entries(BALANCE.shop)) if(k!=='basePrice'){
-    const n=state.shopPurchases[k];
-    const price=BALANCE.shop.basePrice*Math.pow(1.6,n);
-    document.getElementById('s_'+k).textContent = `lvl ${n}, price ${price.toFixed(0)}`;
-  }
+function triggerEvent(){
+  const ev=EVENTS[(Math.random()*EVENTS.length)|0];
+  if(ev.instant) ev.instant(state);
+  if(ev.buff) state.buffs.push({key:ev.buff.key,mul:ev.buff.mul,t:ev.buff.t});
+  state.eventMsg=`${ev.n}: ${ev.msg}`;
 }
 
 function draw(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle='#5a3f2e'; ctx.fillRect(40,120,90,130);
-  ctx.fillStyle='#8fd5ff'; ctx.fillRect(0,0,canvas.width,35);
-  ctx.fillStyle='#fff'; ctx.fillText(`Base HP: ${state.baseHP.toFixed(1)}`,44,116);
-  for(const e of state.battle.enemies){
-    if(e.reached) continue;
-    ctx.fillStyle=e.alive?'#d9534f':'#555';
-    ctx.fillRect(e.x,e.y,28,28);
-    const w=40, hpw=(e.hp/e.maxHp)*w;
-    ctx.fillStyle='#111'; ctx.fillRect(e.x-6,e.y-10,w,5);
-    ctx.fillStyle='#52ff7f'; ctx.fillRect(e.x-6,e.y-10,Math.max(0,hpw),5);
+  const shake=state.battle.shake||0;
+  if(state.battle.shake>0) state.battle.shake=Math.max(0,state.battle.shake-0.8);
+  const ox=(Math.random()-0.5)*shake, oy=(Math.random()-0.5)*shake;
+  ctx.save(); ctx.clearRect(0,0,canvas.width,canvas.height); ctx.translate(ox,oy);
+  for(let i=0;i<canvas.width;i+=80){ ctx.fillStyle=`rgba(20,${20+i%60},40,.28)`; ctx.fillRect(i,0,60,canvas.height); }
+  ctx.strokeStyle='rgba(255,255,255,.07)'; for(let x=0;x<canvas.width;x+=55){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,410);ctx.stroke();}
+  ctx.strokeStyle='rgba(166,216,255,.3)'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(1030,205); ctx.lineTo(80,205); ctx.stroke();
+  drawFortress();
+
+  for(const p of state.battle.projectiles){
+    ctx.fillStyle={bullet:'#f4f4f4',bolt:'#9fd8ff',rocket:'#ffa564',laser:'#ff5d5d',flame:'#ff912f',emp:'#87a5ff'}[p.type]||'#fff';
+    ctx.beginPath(); ctx.arc(p.x+p.vx*(0.3-p.t),p.y+p.vy*(0.3-p.t),3,0,7); ctx.fill();
   }
-  if(state.battle.text){ ctx.fillStyle='#fff'; ctx.font='bold 32px sans-serif'; ctx.fillText(state.battle.text,canvas.width/2-70,60); }
-  if(state.gameOver){ ctx.fillStyle='#ff7b7b'; ctx.font='bold 42px sans-serif'; ctx.fillText('DEFEAT',canvas.width/2-85,200); }
+  for(const en of state.battle.enemies){
+    ctx.fillStyle=enemyStyles[en.type]||'#fff'; ctx.beginPath();
+    if(en.type==='tank') ctx.rect(en.x-12,en.y-10,24,20);
+    else if(en.type==='sniper'){ctx.moveTo(en.x,en.y-13);ctx.lineTo(en.x+12,en.y+12);ctx.lineTo(en.x-12,en.y+12);ctx.closePath();}
+    else if(en.type==='boss'){ctx.arc(en.x,en.y,17,0,7);} else ctx.arc(en.x,en.y,en.type==='swarm'?6:9,0,7);
+    ctx.fill();
+    const hp=Math.max(0,en.hp/en.maxHp), sh=Math.max(0,en.shield/en.maxHp);
+    ctx.fillStyle='#1f2940'; ctx.fillRect(en.x-15,en.y-20,30,4); ctx.fillStyle='#ff6969'; ctx.fillRect(en.x-15,en.y-20,30*hp,4);
+    if(sh>0){ctx.fillStyle='#88d4ff'; ctx.fillRect(en.x-15,en.y-16,30*sh,3);}    
+    let i=0; if(en.slow>0){ctx.fillStyle='#89d4ff';ctx.fillText('❄',en.x-10+i*10,en.y-24);i++;} if(en.burn>0){ctx.fillStyle='#ff9b63';ctx.fillText('🔥',en.x-10+i*10,en.y-24);i++;} if(en.stun>0){ctx.fillStyle='#ffe566';ctx.fillText('⚡',en.x-10+i*10,en.y-24);}    
+  }
+  for(const p of state.battle.particles){ ctx.fillStyle=p.c; ctx.fillRect(p.x+p.vx*(0.55-p.t)*0.04,p.y+p.vy*(0.55-p.t)*0.04,2,2); }
+  for(const n of state.battle.numbers){ ctx.fillStyle=n.c; ctx.fillText(n.text,n.x,n.y-(0.8-n.t)*20); }
+  ctx.restore();
+}
+function drawFortress(){
+  const o=state.outer/100, i=state.inner/100;
+  ctx.fillStyle='#1e2d45'; ctx.fillRect(20,150,100,110); ctx.fillStyle='#7eb0ff'; ctx.fillRect(26,156,88,98);
+  for(let s=0;s<8;s++){ const x=620+s*24; ctx.fillStyle=o>0?'#8598b6':'#4e5664'; ctx.fillRect(x,130,16,150); if(o<0.65&&Math.random()<0.1){ctx.strokeStyle='rgba(255,80,80,.6)';ctx.beginPath();ctx.moveTo(x+4,175);ctx.lineTo(x+8,210);ctx.stroke();}}
+  ctx.fillStyle=i>0?'#9bb0cf':'#5d6677'; ctx.fillRect(430,120,28,170);
+  if(i<0.7){ ctx.strokeStyle='rgba(255,92,92,.65)'; for(let k=0;k<5;k++){ctx.beginPath();ctx.moveTo(430+Math.random()*25,130+k*22);ctx.lineTo(430+Math.random()*25,145+k*22);ctx.stroke();}}
+  ctx.fillStyle='rgba(180,220,255,.8)'; ctx.fillText('Outer',620,120); ctx.fillText('Inner',430,110); ctx.fillText('Core',25,145);
 }
 
-function saveGame(){
-  localStorage.setItem('bd_save_v1', JSON.stringify({state}));
+function render(){
+  const r=calc();
+  $('#stats').innerHTML = [
+    ['Money',state.money],['Food',`${fmt(state.food)} / ${state.foodCap}`],['Materials',`${fmt(state.materials)} / ${state.materialsCap}`],['Energy',`${fmt(state.energy)} / ${state.energyCap}`],['Ammo',`${fmt(state.ammo)} / ${state.ammoCap}`],
+    ['Base HP',state.baseHP],['Wave',state.wave],['Outer',state.outer],['Inner',state.inner],['Eff',`${(r.ge*100).toFixed(0)}%`]
+  ].map(s=>`<div class="stat"><div class="small">${s[0]}</div><b>${typeof s[1]==='number'?fmt(s[1]):s[1]}</b></div>`).join('');
+
+  const tte = [ ['food',state.food,r.upkeepFood-r.food*r.ge], ['energy',state.energy,r.upkeepEnergy-r.energy*r.ge], ['ammo',state.ammo,r.ammoUse-r.ammo*r.ge] ].map(([n,v,d])=>d>0?`${n}: ${(v/d).toFixed(1)}s`:`${n}: stable`);
+  const warn=[];
+  if(state.food<0) warn.push('⚠ STARVING active');
+  if(state.energy<0) warn.push('⚠ BLACKOUT active');
+  if(state.ammo<=0) warn.push('⚠ LOW AMMO active');
+  $('#warnings').innerHTML = `${warn.join(' | ')}<br><span class="small">Time to empty → ${tte.join(' • ')}</span>`;
+
+  $('#combatHud').innerHTML = [
+    `Enemies: ${state.battle.enemies.length}`,
+    `Ammo use/s: ${r.ammoUse.toFixed(2)}`,
+    `Energy use/s: ${r.upkeepEnergy.toFixed(2)}`,
+    `Integrity O/I: ${state.outer.toFixed(0)} / ${state.inner.toFixed(0)}`,
+    `Threat: ${Math.min(100,(state.wave*4 + state.battle.enemies.length*1.2)).toFixed(0)}%`
+  ].map(x=>`<div class="stat">${x}</div>`).join('');
+
+  $('#battleInfo').textContent = state.gameOver ? 'GAME OVER' : state.battle.active ? `Wave ${state.wave} käynnissä` : `Seuraava hyökkäys ${state.attackCooldown.toFixed(1)}s`;
+  $('#preTimer').textContent = state.prewave>0?state.prewave.toFixed(1):'-';
+  $('#eventBox').textContent = state.eventMsg || 'Ei aktiivista eventtiä';
+
+  renderBuildings(); renderShop();
 }
 
-function loadGame(silent){
-  const raw=localStorage.getItem('bd_save_v1');
-  if(!raw){ if(!silent) alert('No save found'); return; }
-  try{
-    const data=JSON.parse(raw).state;
-    Object.assign(state,data);
-    state.battle.active=false; state.battle.enemies=[];
-  }catch(e){ if(!silent) alert('Load failed'); }
+function renderBuildings(){
+  const s=state.search.toLowerCase();
+  const list=state.buildings.filter(b=>b.category===state.tab && b.name.toLowerCase().includes(s) && (state.tierFilter==='all'||b.tier==state.tierFilter));
+  $('#buildings').innerHTML = list.map(b=>{
+    const bc=buildCost(b), uc=upgCost(b), ac=ascCost(b);
+    return `<div class="brow"><div><b>${b.name}</b><br><span class="small">T${b.tier} cnt:${b.count} lvl:${b.level} asc:${b.ascendRank} dmg:${b.damageLevel}</span></div>
+      <button onclick="buyId('${b.id}')">Build<br><span class='small'>${fmt(bc.money)}$/${fmt(bc.materials)}m</span></button>
+      <button onclick="upgId('${b.id}')">Upgrade<br><span class='small'>${fmt(uc.money)}$/${fmt(uc.materials)}m</span></button>
+      <button onclick="ascId('${b.id}')" ${b.level<25||b.ascendRank>=20?'disabled':''}>Ascend<br><span class='small'>${fmt(ac.money)}$/${fmt(ac.materials)}m</span></button>
+      <button onclick="repairId('${b.id}')">Repair</button></div>`;
+  }).join('');
+}
+function renderShop(){
+  $('#shop').innerHTML = Object.entries(BONUS_SHOP).map(([k,v])=>{
+    const buys=state.shop[k], price=1500*Math.pow(1.65,buys), cap=v.cap;
+    const now=(buys*v.gain).toFixed(2);
+    return `<div class='line' style='margin-top:7px'><span>${v.name} <span class='small'>(${now}/${cap})</span></span><button onclick="buyShop('${k}')">${fmt(price)}$</button></div>`;
+  }).join('');
 }
 
-init();
+function buyShop(k){ const p=1500*Math.pow(1.65,state.shop[k]); const cap=BONUS_SHOP[k].cap; if(state.money>=p && state.shop[k]*BONUS_SHOP[k].gain<cap){state.money-=p;state.shop[k]++;}}
+function byId(id){return state.buildings.find(b=>b.id===id);} window.buyId=id=>buy(byId(id)); window.upgId=id=>upg(byId(id)); window.ascId=id=>ascend(byId(id));
+window.repairId=id=>{const b=byId(id), cM=200*(1+b.damageLevel), cMat=80*(1+b.damageLevel); if(b.damageLevel>0&&state.money>=cM&&state.materials>=cMat){state.money-=cM;state.materials-=cMat;b.damageLevel--;}};
+
+function bind(){
+  $$('[data-tab]').forEach(b=>b.onclick=()=>{$$('[data-tab]').forEach(x=>x.classList.remove('active'));b.classList.add('active');state.tab=b.dataset.tab;});
+  $('#search').oninput=e=>state.search=e.target.value; $('#tierFilter').onchange=e=>state.tierFilter=e.target.value;
+  $$('[data-choice]').forEach(b=>b.onclick=()=>state.choice=b.dataset.choice);
+  $('#repairOuter').onclick=()=>{const m=320,n=120;if(state.money>=m&&state.materials>=n){state.money-=m;state.materials-=n;state.outer=Math.min(100,state.outer+18);}};
+  $('#repairInner').onclick=()=>{const m=360,n=140;if(state.money>=m&&state.materials>=n){state.money-=m;state.materials-=n;state.inner=Math.min(100,state.inner+16);}};
+  $('#repairRandom').onclick=()=>{const d=state.buildings.filter(b=>b.damageLevel>0); if(!d.length)return; const b=d[(Math.random()*d.length)|0]; window.repairId(b.id);};
+  $('#saveBtn').onclick=save; $('#loadBtn').onclick=()=>load(false); $('#resetBtn').onclick=()=>{localStorage.removeItem('bunker_save_v2'); location.reload();};
+  $('#dbgToggle').onclick=()=>$('#debugPanel').style.display=$('#debugPanel').style.display==='flex'?'none':'flex';
+  $$('#debugPanel [data-speed]').forEach(b=>b.onclick=()=>state.timeScale=+b.dataset.speed);
+  $('#dbgWave').onclick=()=>{if(!state.battle.active)startWave();};
+  $('#dbgRes').onclick=()=>{state.money+=5000;state.food+=500;state.materials+=500;state.energy+=300;state.ammo+=300;};
+  $('#dbgHeal').onclick=()=>{state.baseHP=START.baseHP;state.outer=100;state.inner=100;state.buildings.forEach(b=>b.damageLevel=0);};
+}
+
+function save(){ localStorage.setItem('bunker_save_v2',JSON.stringify(state)); }
+function load(silent){
+  const raw=localStorage.getItem('bunker_save_v2'); if(!raw) return;
+  const d=JSON.parse(raw);
+  const fresh=createBuildings();
+  const map=new Map(d.buildings.map(b=>[b.id,b]));
+  for(const fb of fresh){ if(map.has(fb.id)) Object.assign(fb,map.get(fb.id)); }
+  d.buildings=fresh; Object.assign(state,d);
+  if(!silent) state.eventMsg='Tallennus ladattu';
+}
+
+let last=performance.now();
+function frame(now){ const dt=Math.min(0.12,(now-last)/1000)*state.timeScale; last=now; update(dt); draw(); render(); requestAnimationFrame(frame); }
+bind(); load(true); setInterval(save,5000); requestAnimationFrame(frame);
 </script>
 </body>
 </html>
